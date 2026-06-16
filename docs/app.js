@@ -73,13 +73,24 @@ async function processImage(image) {
         let peterProb = 0;
         let paulProb = 0;
         
-        for (let i = 0; i < 8400; i++) {
-            const offset = i * 40;
-            const classStart = offset + 36;
+        const numDetections = 8400;
+        const numClasses = 4;
+        const numCoords = 4;
+        const numMaskCoeffs = 32;
+        const totalAttrs = numCoords + numMaskCoeffs + numClasses;
+        
+        for (let i = 0; i < numDetections; i++) {
+            const offset = i * totalAttrs;
+            const classStart = offset + numCoords + numMaskCoeffs;
+            
             const scorePeter = detections[classStart + 2];
             const scorePaul = detections[classStart + 3];
-            if (scorePeter > peterProb) peterProb = scorePeter;
-            if (scorePaul > paulProb) paulProb = scorePaul;
+            
+            const peterSigmoid = 1 / (1 + Math.exp(-scorePeter));
+            const paulSigmoid = 1 / (1 + Math.exp(-scorePaul));
+            
+            if (peterSigmoid > peterProb) peterProb = peterSigmoid;
+            if (paulSigmoid > paulProb) paulProb = paulSigmoid;
         }
         
         console.log('Вероятности - Петр:', peterProb, 'Павел:', paulProb);
