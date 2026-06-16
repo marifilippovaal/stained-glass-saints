@@ -4,8 +4,8 @@ let modelLoading = false;
 
 const classNames = {
     0: "key",
-    1: "saint Paul",
-    2: "saint Peter",
+    1: "saint Peter",
+    2: "saint Paul",
     3: "sword"
 };
 
