@@ -47,6 +47,40 @@ async function loadModel() {
     }
 }
 
+function nms(detections, iouThreshold) {
+    if (detections.length === 0) return [];
+    if (iouThreshold === undefined) iouThreshold = 0.5;
+    
+    detections.sort(function(a, b) { return b.prob - a.prob; });
+    let selected = [];
+    
+    for (let i = 0; i < detections.length; i++) {
+        let keep = true;
+        for (let j = 0; j < selected.length; j++) {
+            var x1 = Math.max(detections[i].x1, selected[j].x1);
+            var y1 = Math.max(detections[i].y1, selected[j].y1);
+            var x2 = Math.min(detections[i].x2, selected[j].x2);
+            var y2 = Math.min(detections[i].y2, selected[j].y2);
+            
+            if (x1 < x2 && y1 < y2) {
+                var intersection = (x2 - x1) * (y2 - y1);
+                var area1 = (detections[i].x2 - detections[i].x1) * (detections[i].y2 - detections[i].y1);
+                var area2 = (selected[j].x2 - selected[j].x1) * (selected[j].y2 - selected[j].y1);
+                var iou = intersection / (area1 + area2 - intersection);
+                
+                if (iou > iouThreshold) {
+                    keep = false;
+                    break;
+                }
+            }
+        }
+        if (keep) {
+            selected.push(detections[i]);
+        }
+    }
+    return selected;
+}
+
 async function processImage(image) {
     if (!modelReady) {
         document.getElementById('saintName').textContent = 'Загрузка модели...';
@@ -59,73 +93,118 @@ async function processImage(image) {
         document.getElementById('saintName').textContent = 'Обработка...';
         document.getElementById('saintDescription').textContent = 'Анализ изображения';
         
-        const canvas = document.createElement('canvas');
+        var canvas = document.createElement('canvas');
         canvas.width = 640;
         canvas.height = 640;
-        const ctx = canvas.getContext('2d');
+        var ctx = canvas.getContext('2d');
         ctx.drawImage(image, 0, 0, 640, 640);
         
-        const imageData = ctx.getImageData(0, 0, 640, 640);
-        const data = imageData.data;
-        const floatData = new Float32Array(3 * 640 * 640);
+        var imageData = ctx.getImageData(0, 0, 640, 640);
+        var data = imageData.data;
+        var floatData = new Float32Array(3 * 640 * 640);
         
-        for (let i = 0; i < data.length; i += 4) {
-            const idx = i / 4;
+        for (var i = 0; i < data.length; i += 4) {
+            var idx = i / 4;
             floatData[idx] = data[i] / 255.0;
             floatData[640*640 + idx] = data[i+1] / 255.0;
             floatData[2*640*640 + idx] = data[i+2] / 255.0;
         }
         
-        const inputTensor = new ort.Tensor('float32', floatData, [1, 3, 640, 640]);
-        const results = await session.run({ images: inputTensor });
+        var inputTensor = new ort.Tensor('float32', floatData, [1, 3, 640, 640]);
+        var results = await session.run({ images: inputTensor });
         
         console.log('Инференс выполнен');
         
-        const detections = results.output0.data;
-        const numDetections = 8400;
-        const numClasses = 4;
-        const numCoords = 4;
-        const numMaskCoeffs = 32;
-        const totalAttrs = numCoords + numMaskCoeffs + numClasses;
+        var detections = results.output0.data;
+        var numDetections = 8400;
+        var numClasses = 4;
+        var numCoords = 4;
+        var numMaskCoeffs = 32;
+        var totalAttrs = numCoords + numMaskCoeffs + numClasses;
         
-        let maxConf = {
+        var allDetections = [];
+        var classIds = {
+            "key": 0,
+            "saint Paul": 1,
+            "saint Peter": 2,
+            "sword": 3
+        };
+        
+        for (var i2 = 0; i2 < numDetections; i2++) {
+            var offset = i2 * totalAttrs;
+            var classStart = offset + numCoords + numMaskCoeffs;
+            
+            var maxProb = 0;
+            var maxClass = -1;
+            for (var c = 0; c < numClasses; c++) {
+                var score = detections[classStart + c];
+                var prob = 1 / (1 + Math.exp(-score));
+                if (prob > maxProb) {
+                    maxProb = prob;
+                    maxClass = c;
+                }
+            }
+            
+            if (maxProb > 0.25 && maxClass >= 0) {
+                var x1 = detections[offset];
+                var y1 = detections[offset + 1];
+                var x2 = detections[offset + 2];
+                var y2 = detections[offset + 3];
+                
+                allDetections.push({
+                    classId: maxClass,
+                    className: classNames[maxClass],
+                    prob: maxProb,
+                    x1: x1,
+                    y1: y1,
+                    x2: x2,
+                    y2: y2
+                });
+            }
+        }
+        
+        console.log('Всего детекций до NMS:', allDetections.length);
+        
+        var classGroups = {};
+        for (var d = 0; d < allDetections.length; d++) {
+            var det = allDetections[d];
+            if (!classGroups[det.className]) {
+                classGroups[det.className] = [];
+            }
+            classGroups[det.className].push(det);
+        }
+        
+        var maxConf = {
             "saint Peter": 0.0,
             "saint Paul": 0.0,
             "key": 0.0,
             "sword": 0.0
         };
         
-        for (let i = 0; i < numDetections; i++) {
-            const offset = i * totalAttrs;
-            const classStart = offset + numCoords + numMaskCoeffs;
-            
-            for (let c = 0; c < numClasses; c++) {
-                const score = detections[classStart + c];
-                const prob = 1 / (1 + Math.exp(-score));
-                const className = classNames[c];
-                if (maxConf[className] !== undefined) {
-                    if (prob > maxConf[className]) {
-                        maxConf[className] = prob;
-                    }
-                }
+        for (var className in classGroups) {
+            var dets = classGroups[className];
+            var filtered = nms(dets, 0.5);
+            if (filtered.length > 0) {
+                filtered.sort(function(a, b) { return b.prob - a.prob; });
+                maxConf[className] = filtered[0].prob;
             }
         }
         
-        console.log('Максимальные уверенности:', maxConf);
+        console.log('Максимальные уверенности после NMS:', maxConf);
         
-        const peterRaw = maxConf["saint Peter"] || 0;
-        const paulRaw = maxConf["saint Paul"] || 0;
-        const keyConf = maxConf["key"] || 0;
-        const swordConf = maxConf["sword"] || 0;
+        var peterRaw = maxConf["saint Peter"] || 0;
+        var paulRaw = maxConf["saint Paul"] || 0;
+        var keyConf = maxConf["key"] || 0;
+        var swordConf = maxConf["sword"] || 0;
         
         console.log('peterRaw:', peterRaw, 'paulRaw:', paulRaw, 'keyConf:', keyConf, 'swordConf:', swordConf);
         
-        const peterScore = 1 - (1 - peterRaw) * (1 - keyConf);
-        const paulScore = 1 - (1 - paulRaw) * (1 - swordConf);
-        const total = peterScore + paulScore;
+        var peterScore = 1 - (1 - peterRaw) * (1 - keyConf);
+        var paulScore = 1 - (1 - paulRaw) * (1 - swordConf);
+        var total = peterScore + paulScore;
         
-        let peterProb = 0;
-        let paulProb = 0;
+        var peterProb = 0;
+        var paulProb = 0;
         
         if (total > 0) {
             peterProb = peterScore / total;
@@ -134,8 +213,7 @@ async function processImage(image) {
         
         console.log('Пётр:', peterProb, 'Павел:', paulProb);
         
-        let verdict = 'Неопределенно';
-        let verdictColor = '#777';
+        var verdict = 'Неопределенно';
         
         if (total === 0) {
             verdict = 'Апостол не определён';
@@ -155,13 +233,13 @@ async function processImage(image) {
             verdict = 'Скорее Павел';
         }
         
-        let evidence = [];
+        var evidence = [];
         if (peterRaw > 0.1) evidence.push('Фигура Петра ' + (peterRaw * 100).toFixed(0) + '%');
         if (keyConf > 0.1) evidence.push('Ключ ' + (keyConf * 100).toFixed(0) + '%');
         if (paulRaw > 0.1) evidence.push('Фигура Павла ' + (paulRaw * 100).toFixed(0) + '%');
         if (swordConf > 0.1) evidence.push('Меч ' + (swordConf * 100).toFixed(0) + '%');
         
-        const evidenceText = evidence.length > 0 ? evidence.join(' + ') : 'Нет уверенных обнаружений';
+        var evidenceText = evidence.length > 0 ? evidence.join(' + ') : 'Нет уверенных обнаружений';
         
         console.log('Вердикт:', verdict);
         
@@ -207,24 +285,24 @@ function loadInfo(verdict, callback) {
     }
 }
 
-const imageInput = document.getElementById('imageInput');
-const preview = document.getElementById('preview');
-const previewContainer = document.getElementById('previewContainer');
-const saintName = document.getElementById('saintName');
-const saintDescription = document.getElementById('saintDescription');
-const probabilities = document.getElementById('probabilities');
+var imageInput = document.getElementById('imageInput');
+var preview = document.getElementById('preview');
+var previewContainer = document.getElementById('previewContainer');
+var saintName = document.getElementById('saintName');
+var saintDescription = document.getElementById('saintDescription');
+var probabilities = document.getElementById('probabilities');
 
 loadModel();
 
 imageInput.addEventListener('change', function(e) {
-    const file = e.target.files[0];
+    var file = e.target.files[0];
     if (!file) return;
     
     saintName.textContent = 'Обработка...';
     saintDescription.textContent = 'Анализ изображения';
     probabilities.innerHTML = '';
     
-    const reader = new FileReader();
+    var reader = new FileReader();
     reader.onload = function(event) {
         preview.src = event.target.result;
         previewContainer.style.display = 'block';
@@ -243,8 +321,8 @@ imageInput.addEventListener('change', function(e) {
                     saintDescription.textContent = desc;
                 });
                 
-                const peterPercent = (result.peter_probability * 100).toFixed(1);
-                const paulPercent = (result.paul_probability * 100).toFixed(1);
+                var peterPercent = (result.peter_probability * 100).toFixed(1);
+                var paulPercent = (result.paul_probability * 100).toFixed(1);
                 
                 probabilities.innerHTML = 
                     '<div style="text-align:left; padding:10px;">' +
