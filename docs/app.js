@@ -4,8 +4,8 @@ let modelLoading = false;
 
 const classNames = {
     0: "key",
-    1: "saint Peter",
-    2: "saint Paul",
+    1: "saint Paul",
+    2: "saint Peter",
     3: "sword"
 };
 
@@ -85,8 +85,8 @@ async function processImage(image) {
         
         var maxConf = {
             "key": 0.0,
-            "saint Peter": 0.0,
             "saint Paul": 0.0,
+            "saint Peter": 0.0,
             "sword": 0.0
         };
         
