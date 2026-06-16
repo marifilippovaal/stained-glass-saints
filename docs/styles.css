@@ -1,223 +1,189 @@
-/* ==========================================================================
-   Saint Detector — витражная тема
-   Палитра: индиго-ночь / сапфир (Пётр) / рубин (Павел) / античное золото
-   ========================================================================== */
-
 * {
     margin: 0;
     padding: 0;
     box-sizing: border-box;
 }
 
-:root {
-    --color-bg:           #0b0e2b;
-    --color-bg-deep:      #05060f;
-    --color-sapphire:     #2451c4;
-    --color-sapphire-lt:  #6fa8ff;
-    --color-ruby:         #9c1f3f;
-    --color-ruby-lt:      #ff6b85;
-    --color-gold:         #d4af37;
-    --color-gold-bright:  #f5d886;
-    --color-lead:         #14141c;
-    --color-parchment:    #f3ead9;
-    --color-parchment-dim:#bdb3a0;
-
-    --font-display: 'Cinzel Decorative', 'Cinzel', serif;
-    --font-body:    'Cormorant Garamond', Georgia, serif;
-    --font-utility: 'Inter', 'Segoe UI', sans-serif;
-}
-
-@media (prefers-reduced-motion: reduce) {
-    * { animation-duration: 0.001ms !important; animation-iteration-count: 1 !important; }
-}
-
-html, body {
-    min-height: 100vh;
-}
-
 body {
-    font-family: var(--font-utility);
-    color: var(--color-parchment);
+    font-family: 'Inter', 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+    background: linear-gradient(135deg, #1a1a2e, #16213e);
+    color: white;
+    min-height: 100vh;
     display: flex;
     justify-content: center;
-    align-items: flex-start;
-    padding: 48px 20px;
-    position: relative;
-    overflow-x: hidden;
+    align-items: center;
+    padding: 20px;
 }
 
-/* ── Фоновая фотография витража (зафиксирована, затемнена, лёгкое размытие) ── */
 .bg-photo {
     position: fixed;
-    inset: 0;
-    z-index: -2;
-    background: url('assets/stained-glass-bg.jpg') center 30% / cover no-repeat;
-    filter: saturate(1.15) brightness(0.45) blur(1.5px);
-    transform: scale(1.03); /* скрывает края после blur */
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background-image: url('assets/stained-glass-bg.jpg');
+    background-size: cover;
+    background-position: center;
+    background-repeat: no-repeat;
+    opacity: 0.15;
+    z-index: 0;
 }
 
 .bg-veil {
     position: fixed;
-    inset: 0;
-    z-index: -1;
-    background:
-        radial-gradient(ellipse 80% 50% at 50% 0%, rgba(36, 20, 70, 0.25), transparent 60%),
-        linear-gradient(180deg, rgba(5,6,15,0.78) 0%, rgba(7,8,20,0.92) 45%, rgba(5,6,15,0.97) 100%);
-}
-
-/* ── Каркас страницы ── */
-.container {
-    max-width: 720px;
+    top: 0;
+    left: 0;
     width: 100%;
-    background: linear-gradient(165deg, rgba(28, 32, 64, 0.55), rgba(10, 12, 26, 0.7));
-    border: 1px solid rgba(212, 175, 55, 0.28);
-    border-radius: 18px;
-    padding: 48px 40px;
-    backdrop-filter: blur(10px);
-    box-shadow:
-        0 0 0 1px rgba(0,0,0,0.4),
-        0 30px 70px rgba(0,0,0,0.55),
-        inset 0 0 60px rgba(0,0,0,0.35);
+    height: 100%;
+    background: radial-gradient(ellipse at center, rgba(26, 26, 46, 0.6) 0%, rgba(22, 33, 62, 0.9) 100%);
+    z-index: 1;
 }
 
-/* ── Роза-окно: фирменный элемент страницы, нарисован чистым CSS ── */
-.rose-window {
-    width: 128px;
-    height: 128px;
-    margin: 0 auto 22px;
-    border-radius: 50%;
+.container {
     position: relative;
-    background:
-        repeating-conic-gradient(
-            rgba(212,175,55,0.9) 0deg 1.5deg,
-            transparent 1.5deg 30deg
-        ),
-        conic-gradient(
-            var(--color-sapphire)   0deg   60deg,
-            var(--color-ruby)      60deg  120deg,
-            var(--color-sapphire) 120deg  180deg,
-            var(--color-ruby)     180deg  240deg,
-            var(--color-sapphire) 240deg  300deg,
-            var(--color-ruby)     300deg  360deg
-        );
-    box-shadow:
-        0 0 0 4px var(--color-lead),
-        0 0 0 6px var(--color-gold),
-        0 0 36px 6px rgba(212, 175, 55, 0.45);
-    animation: candle-glow 5s ease-in-out infinite;
-}
-
-.rose-window::after {
-    content: "";
-    position: absolute;
-    inset: 32%;
-    border-radius: 50%;
-    background: radial-gradient(circle, var(--color-gold-bright), var(--color-gold) 65%, transparent 100%);
-    box-shadow: 0 0 22px 8px rgba(245, 216, 134, 0.55);
-}
-
-@keyframes candle-glow {
-    0%, 100% { box-shadow: 0 0 0 4px var(--color-lead), 0 0 0 6px var(--color-gold), 0 0 36px 6px rgba(212,175,55,0.40); }
-    50%      { box-shadow: 0 0 0 4px var(--color-lead), 0 0 0 6px var(--color-gold), 0 0 52px 12px rgba(212,175,55,0.62); }
+    z-index: 2;
+    max-width: 1000px;
+    width: 100%;
+    background: rgba(255, 255, 255, 0.05);
+    backdrop-filter: blur(10px);
+    border-radius: 20px;
+    padding: 40px;
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.5);
+    border: 1px solid rgba(255, 255, 255, 0.05);
 }
 
 header {
     text-align: center;
-    margin-bottom: 36px;
+    margin-bottom: 30px;
+    position: relative;
 }
 
+.rose-window {
+    width: 80px;
+    height: 80px;
+    margin: 0 auto 15px;
+    border-radius: 50%;
+    background: radial-gradient(circle at 30% 30%, #8B0000, #FF0000, #CC0000, #8B0000);
+    box-shadow: 0 0 40px rgba(255, 0, 0, 0.3), inset 0 0 30px rgba(255, 200, 0, 0.2);
+    position: relative;
+}
+
+.rose-window::before {
+    content: '';
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    width: 20px;
+    height: 20px;
+    border-radius: 50%;
+    background: radial-gradient(circle, #FFD700, #FF8C00);
+    box-shadow: 0 0 20px rgba(255, 215, 0, 0.5);
+}
+
+.rose-window::after {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    border-radius: 50%;
+    background: 
+        radial-gradient(circle at 20% 30%, rgba(255, 255, 255, 0.15) 0%, transparent 40%),
+        repeating-conic-gradient(
+            from 0deg,
+            transparent 0deg,
+            transparent 30deg,
+            rgba(255, 255, 255, 0.05) 30deg,
+            rgba(255, 255, 255, 0.05) 31deg,
+            transparent 31deg,
+            transparent 60deg
+        );
+    pointer-events: none;
+}
+
+.rose-window .petal {
+    position: absolute;
+    width: 28px;
+    height: 28px;
+    border-radius: 50% 50% 50% 0;
+    background: radial-gradient(ellipse at 30% 30%, #FF3333, #8B0000);
+    box-shadow: 0 0 15px rgba(255, 0, 0, 0.4);
+    transform-origin: center center;
+}
+
+/* Все лепестки красные */
+.rose-window .petal:nth-child(1) { transform: translate(-50%, -50%) rotate(0deg) translateY(-30px); }
+.rose-window .petal:nth-child(2) { transform: translate(-50%, -50%) rotate(30deg) translateY(-30px); }
+.rose-window .petal:nth-child(3) { transform: translate(-50%, -50%) rotate(60deg) translateY(-30px); }
+.rose-window .petal:nth-child(4) { transform: translate(-50%, -50%) rotate(90deg) translateY(-30px); }
+.rose-window .petal:nth-child(5) { transform: translate(-50%, -50%) rotate(120deg) translateY(-30px); }
+.rose-window .petal:nth-child(6) { transform: translate(-50%, -50%) rotate(150deg) translateY(-30px); }
+.rose-window .petal:nth-child(7) { transform: translate(-50%, -50%) rotate(180deg) translateY(-30px); }
+.rose-window .petal:nth-child(8) { transform: translate(-50%, -50%) rotate(210deg) translateY(-30px); }
+.rose-window .petal:nth-child(9) { transform: translate(-50%, -50%) rotate(240deg) translateY(-30px); }
+.rose-window .petal:nth-child(10) { transform: translate(-50%, -50%) rotate(270deg) translateY(-30px); }
+.rose-window .petal:nth-child(11) { transform: translate(-50%, -50%) rotate(300deg) translateY(-30px); }
+.rose-window .petal:nth-child(12) { transform: translate(-50%, -50%) rotate(330deg) translateY(-30px); }
+
 header h1 {
-    font-family: var(--font-display);
-    font-size: 2.6rem;
-    font-weight: 700;
-    letter-spacing: 0.06em;
-    background: linear-gradient(135deg, var(--color-gold-bright), var(--color-gold) 55%, #a87e1f);
+    font-family: 'Cinzel Decorative', 'Georgia', serif;
+    font-size: 2.5rem;
+    font-weight: 900;
+    background: linear-gradient(135deg, #f7971e, #ffd200);
     -webkit-background-clip: text;
     -webkit-text-fill-color: transparent;
-    background-clip: text;
-    text-shadow: 0 0 30px rgba(212, 175, 55, 0.25);
+    text-shadow: 0 0 40px rgba(247, 151, 30, 0.2);
 }
 
 header p {
-    font-family: var(--font-body);
-    font-style: italic;
-    color: var(--color-parchment-dim);
-    font-size: 1.15rem;
-    margin-top: 8px;
-    letter-spacing: 0.02em;
+    color: #aaa;
+    font-size: 1.1rem;
+    font-family: 'Cormorant Garamond', serif;
+    font-weight: 400;
+    margin-top: 5px;
 }
 
-/* ── Секция загрузки ── */
 .upload-section {
     text-align: center;
-    margin: 28px 0 34px;
+    margin: 20px 0 30px;
 }
 
 .upload-btn {
     display: inline-block;
-    position: relative;
-    padding: 15px 42px;
-    font-family: var(--font-utility);
-    font-weight: 600;
-    letter-spacing: 0.03em;
-    color: var(--color-lead);
-    background: linear-gradient(135deg, var(--color-gold-bright), var(--color-gold) 70%);
+    padding: 15px 40px;
+    background: linear-gradient(135deg, #f7971e, #ffd200);
+    color: #1a1a2e;
     border-radius: 50px;
+    font-weight: bold;
     cursor: pointer;
-    overflow: hidden;
-    box-shadow: 0 4px 18px rgba(212, 175, 55, 0.35), inset 0 1px 0 rgba(255,255,255,0.5);
-    transition: transform 0.2s ease, box-shadow 0.2s ease;
-}
-
-.upload-btn::after {
-    content: "";
-    position: absolute;
-    top: -50%;
-    left: -20%;
-    width: 40%;
-    height: 200%;
-    background: rgba(255,255,255,0.35);
-    transform: rotate(20deg);
-    transition: left 0.5s ease;
+    transition: transform 0.2s, box-shadow 0.2s;
+    font-family: 'Inter', sans-serif;
 }
 
 .upload-btn:hover {
-    transform: translateY(-2px);
-    box-shadow: 0 8px 26px rgba(212, 175, 55, 0.5), inset 0 1px 0 rgba(255,255,255,0.6);
-}
-
-.upload-btn:hover::after {
-    left: 130%;
+    transform: scale(1.05);
+    box-shadow: 0 4px 20px rgba(247, 151, 30, 0.4);
 }
 
 #imageInput {
     display: none;
 }
 
-#statusText {
-    margin-top: 14px !important;
-    font-family: var(--font-utility);
-    font-size: 0.85rem !important;
-    letter-spacing: 0.03em;
-    color: var(--color-parchment-dim) !important;
-    text-transform: uppercase;
-}
-
-/* ── Превью изображения в свинцовой раме ── */
 .image-wrapper {
     position: relative;
-    margin: 22px 0;
-    border-radius: 14px;
+    margin: 20px 0;
+    border-radius: 12px;
     overflow: hidden;
-    background: var(--color-bg-deep);
-    border: 1px solid rgba(212, 175, 55, 0.4);
-    box-shadow: 0 0 0 1px var(--color-lead), 0 14px 40px rgba(0,0,0,0.5);
+    background: rgba(0, 0, 0, 0.4);
+    border: 1px solid rgba(255, 255, 255, 0.05);
 }
 
 #preview {
     width: 100%;
     display: block;
-    max-height: 460px;
+    max-height: 500px;
     object-fit: contain;
 }
 
@@ -230,130 +196,62 @@ header p {
     pointer-events: none;
 }
 
-/* ── Карточка результата ── */
 .result-card {
-    background: linear-gradient(165deg, rgba(36, 40, 74, 0.55), rgba(12, 14, 30, 0.78));
-    border: 1px solid rgba(212, 175, 55, 0.3);
-    padding: 30px 28px;
-    border-radius: 16px;
-    margin-top: 24px;
+    background: rgba(255, 255, 255, 0.05);
+    padding: 25px;
+    border-radius: 12px;
+    margin-top: 20px;
     text-align: center;
-    box-shadow: inset 0 0 36px rgba(0,0,0,0.35);
+    border: 1px solid rgba(255, 255, 255, 0.05);
 }
 
 #saintName {
-    font-family: var(--font-display);
-    font-size: 1.7rem;
-    color: var(--color-gold-bright);
-    letter-spacing: 0.03em;
+    font-family: 'Cinzel Decorative', serif;
+    font-size: 2rem;
+    font-weight: 700;
     margin-bottom: 10px;
+    background: linear-gradient(135deg, #f7971e, #ffd200);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
 }
 
 #saintDescription {
-    font-family: var(--font-body);
-    color: var(--color-parchment);
-    font-size: 1.2rem;
-    line-height: 1.55;
-}
-
-/* ── Шкалы вероятностей ── */
-#probabilities {
-    margin-top: 22px;
-    text-align: left;
+    color: #ccc;
+    font-size: 1.1rem;
+    font-family: 'Cormorant Garamond', serif;
 }
 
 .prob-bar {
     display: flex;
     align-items: center;
-    gap: 14px;
-    margin: 14px 0;
+    gap: 15px;
+    margin: 10px 0;
 }
 
-.prob-label {
-    min-width: 64px;
-    font-family: var(--font-utility);
-    font-weight: 600;
-    font-size: 0.92rem;
-    letter-spacing: 0.02em;
+.prob-bar span:first-child {
+    min-width: 80px;
+    text-align: right;
+    font-weight: 500;
 }
-
-.prob-label--peter { color: var(--color-sapphire-lt); }
-.prob-label--paul  { color: var(--color-ruby-lt); }
 
 .bar {
     flex: 1;
-    height: 10px;
-    background: rgba(0,0,0,0.45);
-    border-radius: 6px;
+    height: 8px;
+    background: rgba(255, 255, 255, 0.1);
+    border-radius: 4px;
     overflow: hidden;
-    box-shadow: inset 0 0 0 1px rgba(212,175,55,0.25);
 }
 
-.bar-fill {
+.bar div {
     height: 100%;
-    border-radius: 6px;
-    transition: width 0.7s ease;
-    box-shadow: 0 0 12px currentColor;
+    border-radius: 4px;
+    transition: width 0.5s ease;
 }
 
-.bar-fill--peter {
-    background: linear-gradient(90deg, var(--color-sapphire), var(--color-sapphire-lt));
-    color: var(--color-sapphire-lt);
-}
-
-.bar-fill--paul {
-    background: linear-gradient(90deg, var(--color-ruby), var(--color-ruby-lt));
-    color: var(--color-ruby-lt);
-}
-
-.prob-value {
-    min-width: 52px;
-    text-align: right;
-    font-family: var(--font-utility);
-    font-size: 0.9rem;
-    color: var(--color-parchment-dim);
-}
-
-.evidence-text {
-    margin-top: 18px;
-    font-family: var(--font-utility);
-    font-size: 0.85rem;
-    color: var(--color-parchment-dim);
-    border-top: 1px solid rgba(212, 175, 55, 0.2);
-    padding-top: 14px;
-}
-
-/* ── Подвал с золотой "перемычкой" ── */
 footer {
     text-align: center;
-    margin-top: 38px;
-    color: var(--color-parchment-dim);
-    font-size: 0.82rem;
-    letter-spacing: 0.04em;
-}
-
-footer::before {
-    content: "";
-    display: block;
-    width: 90px;
-    height: 1px;
-    margin: 0 auto 14px;
-    background: linear-gradient(90deg, transparent, var(--color-gold), transparent);
-}
-
-/* ── Адаптив ── */
-@media (max-width: 600px) {
-    .container { padding: 34px 22px; }
-    header h1 { font-size: 2.05rem; }
-    .rose-window { width: 100px; height: 100px; }
-    #saintName { font-size: 1.4rem; }
-}
-
-/* ── Видимый фокус для клавиатуры ── */
-a:focus-visible,
-button:focus-visible,
-.upload-btn:focus-visible,
-input:focus-visible {
-    outline: 2px solid var(--color-gold-bright);
-    outline-offset: 3px;
+    margin-top: 30px;
+    color: #666;
+    font-size: 0.9rem;
+    font-family: 'Inter', sans-serif;
 }
