@@ -75,13 +75,24 @@ async function processImage(image) {
         console.log('Инференс выполнен');
         
         var detections = results.output0.data;
-        var numDetections = detections.length / 38;
+        var numDetections = 0;
+        
+        // Проверяем формат выхода
+        if (detections.length === 11400) {
+            // Формат с NMS: [1, 38, 300]
+            numDetections = 300;
+            console.log('Формат с NMS: 300 детекций');
+        } else {
+            // Формат без NMS: [1, 40, 8400]
+            numDetections = 8400;
+            console.log('Формат без NMS: 8400 детекций');
+        }
+        
         var numClasses = 4;
         var numCoords = 4;
         var numMaskCoeffs = 32;
         var totalAttrs = 38;
-        
-        console.log('Детекций после NMS:', numDetections);
+        var classStartOffset = numCoords + numMaskCoeffs;
         
         var maxConf = {
             "key": 0.0,
@@ -90,22 +101,46 @@ async function processImage(image) {
             "sword": 0.0
         };
         
+        var detectionsList = [];
+        
         for (var i2 = 0; i2 < numDetections; i2++) {
             var offset = i2 * totalAttrs;
-            var classStart = offset + numCoords + numMaskCoeffs;
+            var classStart = offset + classStartOffset;
             
+            var maxProb = 0;
+            var maxClass = -1;
             for (var c = 0; c < numClasses; c++) {
                 var score = detections[classStart + c];
                 var prob = 1 / (1 + Math.exp(-score));
-                var className = classNames[c];
-                if (maxConf[className] !== undefined) {
-                    if (prob > maxConf[className]) {
-                        maxConf[className] = prob;
-                    }
+                if (prob > maxProb) {
+                    maxProb = prob;
+                    maxClass = c;
+                }
+            }
+            
+            if (maxProb > 0.1) {
+                var className = classNames[maxClass];
+                var x1 = detections[offset];
+                var y1 = detections[offset + 1];
+                var x2 = detections[offset + 2];
+                var y2 = detections[offset + 3];
+                
+                detectionsList.push({
+                    class: className,
+                    prob: maxProb,
+                    x1: x1,
+                    y1: y1,
+                    x2: x2,
+                    y2: y2
+                });
+                
+                if (maxProb > maxConf[className]) {
+                    maxConf[className] = maxProb;
                 }
             }
         }
         
+        console.log('Найдено детекций:', detectionsList.length);
         console.log('Максимальные уверенности:', maxConf);
         
         var peterRaw = maxConf["saint Peter"] || 0;
