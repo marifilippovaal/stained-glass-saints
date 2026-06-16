@@ -327,11 +327,17 @@ imageInput.addEventListener('change', function(e) {
                 var paulPercent = (result.paul_probability * 100).toFixed(1);
                 
                 probabilities.innerHTML = 
-                    '<div style="text-align:left; padding:10px;">' +
-                    '<p><strong>Пётр:</strong> ' + peterPercent + '%</p>' +
-                    '<p><strong>Павел:</strong> ' + paulPercent + '%</p>' +
-                    '<p style="font-size:0.9rem; color:#aaa; margin-top:10px;">Доказательства: ' + result.evidence + '</p>' +
-                    '</div>';
+                    '<div class="prob-bar">' +
+                        '<span class="prob-label prob-label--peter">Пётр</span>' +
+                        '<div class="bar"><div class="bar-fill bar-fill--peter" style="width:' + peterPercent + '%"></div></div>' +
+                        '<span class="prob-value">' + peterPercent + '%</span>' +
+                    '</div>' +
+                    '<div class="prob-bar">' +
+                        '<span class="prob-label prob-label--paul">Павел</span>' +
+                        '<div class="bar"><div class="bar-fill bar-fill--paul" style="width:' + paulPercent + '%"></div></div>' +
+                        '<span class="prob-value">' + paulPercent + '%</span>' +
+                    '</div>' +
+                    '<p class="evidence-text">Доказательства: ' + result.evidence + '</p>';
             });
         };
     };
