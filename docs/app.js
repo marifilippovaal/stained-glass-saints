@@ -1,5 +1,6 @@
 let session = null;
 let modelReady = false;
+let modelLoading = false;
 
 const classNames = {
     0: "key",
@@ -16,14 +17,22 @@ const displayNames = {
 };
 
 async function loadModel() {
+    if (modelLoading || modelReady) {
+        return;
+    }
+    modelLoading = true;
     try {
         console.log('Загрузка модели...');
+        document.getElementById('saintName').textContent = 'Загрузка модели...';
+        document.getElementById('saintDescription').textContent = 'Пожалуйста, подождите';
+        
         const modelUrl = 'model/best.onnx';
         session = await ort.InferenceSession.create(modelUrl, {
             executionProviders: ['wasm'],
             graphOptimizationLevel: 'all'
         });
         modelReady = true;
+        modelLoading = false;
         console.log('Модель успешно загружена!');
         document.getElementById('saintName').textContent = 'Модель готова';
         document.getElementById('saintDescription').textContent = 'Загрузите изображение для распознавания';
@@ -31,20 +40,24 @@ async function loadModel() {
     } catch (error) {
         console.error('Ошибка загрузки модели:', error);
         modelReady = false;
+        modelLoading = false;
         document.getElementById('saintName').textContent = 'Ошибка модели';
-        document.getElementById('saintDescription').textContent = 'Проверьте консоль для деталей';
+        document.getElementById('saintDescription').textContent = 'Перезагрузите страницу';
         return false;
     }
 }
 
 async function processImage(image) {
     if (!modelReady) {
-        alert('Модель еще не загружена, подождите...');
+        document.getElementById('saintName').textContent = 'Загрузка модели...';
+        document.getElementById('saintDescription').textContent = 'Подождите, модель загружается';
         return null;
     }
     
     try {
         console.log('Обработка изображения...');
+        document.getElementById('saintName').textContent = 'Обработка...';
+        document.getElementById('saintDescription').textContent = 'Анализ изображения';
         
         const canvas = document.createElement('canvas');
         canvas.width = 640;
@@ -100,10 +113,12 @@ async function processImage(image) {
         
         console.log('Максимальные уверенности:', maxConf);
         
-        const peterRaw = Math.max(maxConf["saint Peter"] || 0, 0);
-        const paulRaw = Math.max(maxConf["saint Paul"] || 0, 0);
+        const peterRaw = maxConf["saint Peter"] || 0;
+        const paulRaw = maxConf["saint Paul"] || 0;
         const keyConf = maxConf["key"] || 0;
         const swordConf = maxConf["sword"] || 0;
+        
+        console.log('peterRaw:', peterRaw, 'paulRaw:', paulRaw, 'keyConf:', keyConf, 'swordConf:', swordConf);
         
         const peterScore = 1 - (1 - peterRaw) * (1 - keyConf);
         const paulScore = 1 - (1 - paulRaw) * (1 - swordConf);
@@ -117,19 +132,23 @@ async function processImage(image) {
             paulProb = paulScore / total;
         }
         
-        console.log('Итоговые вероятности - Петр:', peterProb, 'Павел:', paulProb);
+        console.log('Пётр:', peterProb, 'Павел:', paulProb);
         
         let verdict = 'Неопределенно';
         let verdictColor = '#777';
         
         if (total === 0) {
             verdict = 'Апостол не определён';
-        } else if (peterProb >= 0.65) {
+        } else if (peterProb >= 0.65 && paulProb < 0.35) {
             verdict = 'Апостол Пётр';
-        } else if (paulProb >= 0.65) {
+        } else if (paulProb >= 0.65 && peterProb < 0.35) {
             verdict = 'Апостол Павел';
         } else if (peterProb >= 0.35 && paulProb >= 0.35) {
-            verdict = 'Оба: Пётр и Павел';
+            if (peterProb > paulProb) {
+                verdict = 'Скорее Пётр (оба присутствуют)';
+            } else {
+                verdict = 'Скорее Павел (оба присутствуют)';
+            }
         } else if (peterProb > paulProb) {
             verdict = 'Скорее Пётр';
         } else {
@@ -143,6 +162,8 @@ async function processImage(image) {
         if (swordConf > 0.1) evidence.push('Меч ' + (swordConf * 100).toFixed(0) + '%');
         
         const evidenceText = evidence.length > 0 ? evidence.join(' + ') : 'Нет уверенных обнаружений';
+        
+        console.log('Вердикт:', verdict);
         
         return {
             verdict: verdict,
@@ -161,7 +182,7 @@ async function processImage(image) {
 }
 
 function loadInfo(verdict, callback) {
-    if (verdict === 'Апостол Пётр' || verdict === 'Скорее Пётр') {
+    if (verdict.includes('Пётр') && !verdict.includes('Павел')) {
         fetch('assets/peter_info.json')
             .then(function(r) { return r.json(); })
             .then(function(data) {
@@ -170,7 +191,7 @@ function loadInfo(verdict, callback) {
             .catch(function() {
                 callback('Апостол Пётр с ключами');
             });
-    } else if (verdict === 'Апостол Павел' || verdict === 'Скорее Павел') {
+    } else if (verdict.includes('Павел') && !verdict.includes('Пётр')) {
         fetch('assets/paul_info.json')
             .then(function(r) { return r.json(); })
             .then(function(data) {
@@ -179,6 +200,8 @@ function loadInfo(verdict, callback) {
             .catch(function() {
                 callback('Апостол Павел с мечом');
             });
+    } else if (verdict.includes('оба')) {
+        callback('На изображении присутствуют оба апостола');
     } else {
         callback('Святой не определён');
     }
@@ -226,8 +249,8 @@ imageInput.addEventListener('change', function(e) {
                 probabilities.innerHTML = 
                     '<div style="text-align:left; padding:10px;">' +
                     '<p><strong>Пётр:</strong> ' + peterPercent + '%</p>' +
-                    '<p style="font-size:0.9rem; color:#aaa; margin-left:15px;">Доказательства: ' + result.evidence + '</p>' +
                     '<p><strong>Павел:</strong> ' + paulPercent + '%</p>' +
+                    '<p style="font-size:0.9rem; color:#aaa; margin-top:10px;">Доказательства: ' + result.evidence + '</p>' +
                     '</div>';
             });
         };
