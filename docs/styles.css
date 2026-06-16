@@ -1,0 +1,143 @@
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+}
+
+body {
+    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+    background: linear-gradient(135deg, #1a1a2e, #16213e);
+    color: white;
+    min-height: 100vh;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    padding: 20px;
+}
+
+.container {
+    max-width: 1000px;
+    width: 100%;
+    background: rgba(255,255,255,0.05);
+    backdrop-filter: blur(10px);
+    border-radius: 20px;
+    padding: 40px;
+    box-shadow: 0 8px 32px rgba(0,0,0,0.5);
+}
+
+header {
+    text-align: center;
+    margin-bottom: 30px;
+}
+
+header h1 {
+    font-size: 2.5rem;
+    background: linear-gradient(135deg, #f7971e, #ffd200);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+}
+
+header p {
+    color: #aaa;
+    font-size: 1.1rem;
+}
+
+.upload-section {
+    text-align: center;
+    margin: 20px 0 30px;
+}
+
+.upload-btn {
+    display: inline-block;
+    padding: 15px 40px;
+    background: linear-gradient(135deg, #f7971e, #ffd200);
+    color: #1a1a2e;
+    border-radius: 50px;
+    font-weight: bold;
+    cursor: pointer;
+    transition: transform 0.2s, box-shadow 0.2s;
+}
+
+.upload-btn:hover {
+    transform: scale(1.05);
+    box-shadow: 0 4px 20px rgba(247, 151, 30, 0.4);
+}
+
+#imageInput {
+    display: none;
+}
+
+.image-wrapper {
+    position: relative;
+    margin: 20px 0;
+    border-radius: 12px;
+    overflow: hidden;
+    background: #0a0a1a;
+}
+
+#preview {
+    width: 100%;
+    display: block;
+    max-height: 500px;
+    object-fit: contain;
+}
+
+#segmentationCanvas {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    pointer-events: none;
+}
+
+.result-card {
+    background: rgba(255,255,255,0.1);
+    padding: 25px;
+    border-radius: 12px;
+    margin-top: 20px;
+    text-align: center;
+}
+
+#saintName {
+    font-size: 2rem;
+    margin-bottom: 10px;
+}
+
+#saintDescription {
+    color: #ccc;
+    font-size: 1.1rem;
+}
+
+.prob-bar {
+    display: flex;
+    align-items: center;
+    gap: 15px;
+    margin: 10px 0;
+}
+
+.prob-bar span:first-child {
+    min-width: 80px;
+    text-align: right;
+}
+
+.bar {
+    flex: 1;
+    height: 8px;
+    background: rgba(255,255,255,0.1);
+    border-radius: 4px;
+    overflow: hidden;
+}
+
+.bar div {
+    height: 100%;
+    border-radius: 4px;
+    transition: width 0.5s ease;
+}
+
+footer {
+    text-align: center;
+    margin-top: 30px;
+    color: #666;
+    font-size: 0.9rem;
+}

@@ -1,0 +1,45 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Saint Detector - Витражи</title>
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1> Saint Detector</h1>
+            <p>Распознавание святых на витражах</p>
+        </header>
+
+        <div class="upload-section">
+            <label for="imageInput" class="upload-btn">
+                📤 Выберите изображение
+            </label>
+            <input type="file" id="imageInput" accept="image/*">
+        </div>
+
+        <div id="previewContainer" style="display:none;">
+            <div class="image-wrapper">
+                <img id="preview" alt="Загруженное изображение">
+                <canvas id="segmentationCanvas"></canvas>
+            </div>
+        </div>
+
+        <div id="result" class="result-card">
+            <h2 id="saintName">Загрузите изображение</h2>
+            <p id="saintDescription"></p>
+            <div id="probabilities"></div>
+        </div>
+
+        <footer>
+            <p>YOLOv8-seg · ONNX Runtime</p>
+        </footer>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/onnxruntime-web@1.17.1/dist/ort.min.js">
+    </script>
+    <script src="app.js"></script>
+</body>
+</html>
