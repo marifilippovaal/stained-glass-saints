@@ -9,6 +9,40 @@ const classNames = {
     3: "sword"
 };
 
+function nms(detections, iouThreshold) {
+    if (detections.length === 0) return [];
+    if (iouThreshold === undefined) iouThreshold = 0.45;
+    
+    detections.sort(function(a, b) { return b.confidence - a.confidence; });
+    var selected = [];
+    
+    for (var i = 0; i < detections.length; i++) {
+        var keep = true;
+        for (var j = 0; j < selected.length; j++) {
+            var x1 = Math.max(detections[i].x1, selected[j].x1);
+            var y1 = Math.max(detections[i].y1, selected[j].y1);
+            var x2 = Math.min(detections[i].x2, selected[j].x2);
+            var y2 = Math.min(detections[i].y2, selected[j].y2);
+            
+            if (x1 < x2 && y1 < y2) {
+                var intersection = (x2 - x1) * (y2 - y1);
+                var area1 = (detections[i].x2 - detections[i].x1) * (detections[i].y2 - detections[i].y1);
+                var area2 = (selected[j].x2 - selected[j].x1) * (selected[j].y2 - selected[j].y1);
+                var iou = intersection / (area1 + area2 - intersection);
+                
+                if (iou > iouThreshold) {
+                    keep = false;
+                    break;
+                }
+            }
+        }
+        if (keep) {
+            selected.push(detections[i]);
+        }
+    }
+    return selected;
+}
+
 async function loadModel() {
     if (modelLoading || modelReady) {
         return;
@@ -74,47 +108,89 @@ async function processImage(image) {
         
         console.log('Инференс выполнен');
         
-        var detections = results.output0.data;
-        var numDetections = 8400;
+        var outputTensor = results.output0;
+        var dims = outputTensor.dims; // ожидаем [1, 40, 8400]
+        var detections = outputTensor.data;
+        console.log('Форма выхода модели:', dims);
+
+        // YOLOv8 экспортирует тензор как [1, attrs, numDetections] (channel-major),
+        // т.е. сначала идут все 8400 значений cx, потом все 8400 значений cy и т.д.
+        // Раньше код читал данные как [1, numDetections, attrs], из-за чего
+        // на месте class-score оказывались координаты/маски — отсюда и
+        // аномально высокая "уверенность" у всех классов.
+        var channelMajor = dims[1] < dims[2];
+        var totalAttrs = channelMajor ? dims[1] : dims[2];
+        var numDetections = channelMajor ? dims[2] : dims[1];
         var numClasses = 4;
         var numCoords = 4;
-        var numMaskCoeffs = 32;
-        var totalAttrs = numCoords + numMaskCoeffs + numClasses;
-        
-        var classStats = {
-            "key": { sum: 0, count: 0, max: 0 },
-            "saint Paul": { sum: 0, count: 0, max: 0 },
-            "saint Peter": { sum: 0, count: 0, max: 0 },
-            "sword": { sum: 0, count: 0, max: 0 }
-        };
-        
-        var confidenceThreshold = 0.4;
-        
+
+        function getAttr(detIdx, attrIdx) {
+            if (channelMajor) {
+                return detections[attrIdx * numDetections + detIdx];
+            }
+            return detections[detIdx * totalAttrs + attrIdx];
+        }
+
+        // Порядок каналов в выходе YOLOv8-seg: [box(4), classes(numClasses), mask_coeffs(32)]
+        // Координаты — это cx, cy, w, h (центр + размеры), а не x1,y1,x2,y2.
+        // Class-скоры уже прошли sigmoid внутри модели при экспорте — повторная
+        // сигмоида здесь была лишней и "сглаживала" все вероятности к середине.
+        var allDetections = [];
+
         for (var i2 = 0; i2 < numDetections; i2++) {
-            var offset = i2 * totalAttrs;
-            var classStart = offset + numCoords + numMaskCoeffs;
-            
+            var cx = getAttr(i2, 0);
+            var cy = getAttr(i2, 1);
+            var w  = getAttr(i2, 2);
+            var h  = getAttr(i2, 3);
+
+            var maxProb = 0;
+            var maxClass = -1;
             for (var c = 0; c < numClasses; c++) {
-                var score = detections[classStart + c];
-                var prob = 1 / (1 + Math.exp(-score));
-                var className = classNames[c];
-                
-                if (prob > confidenceThreshold) {
-                    classStats[className].sum += prob;
-                    classStats[className].count++;
-                    if (prob > classStats[className].max) {
-                        classStats[className].max = prob;
-                    }
+                var prob = getAttr(i2, numCoords + c);
+                if (prob > maxProb) {
+                    maxProb = prob;
+                    maxClass = c;
                 }
+            }
+
+            if (maxProb > 0.3) {
+                var x1 = cx - w / 2;
+                var y1 = cy - h / 2;
+                var x2 = cx + w / 2;
+                var y2 = cy + h / 2;
+
+                allDetections.push({
+                    classId: maxClass,
+                    className: classNames[maxClass],
+                    confidence: maxProb,
+                    x1: x1,
+                    y1: y1,
+                    x2: x2,
+                    y2: y2
+                });
             }
         }
         
+        console.log('Детекций до NMS:', allDetections.length);
+        
+        // Применяем NMS
+        var filteredDetections = nms(allDetections, 0.45);
+        console.log('Детекций после NMS:', filteredDetections.length);
+        
+        // Берем максимальную уверенность для каждого класса
         var maxConf = {
-            "key": classStats["key"].max,
-            "saint Paul": classStats["saint Paul"].max,
-            "saint Peter": classStats["saint Peter"].max,
-            "sword": classStats["sword"].max
+            "key": 0.0,
+            "saint Paul": 0.0,
+            "saint Peter": 0.0,
+            "sword": 0.0
         };
+        
+        for (var d = 0; d < filteredDetections.length; d++) {
+            var det = filteredDetections[d];
+            if (det.confidence > maxConf[det.className]) {
+                maxConf[det.className] = det.confidence;
+            }
+        }
         
         console.log('Максимальные уверенности:', maxConf);
         
@@ -122,6 +198,8 @@ async function processImage(image) {
         var paulRaw = maxConf["saint Paul"] || 0;
         var keyConf = maxConf["key"] || 0;
         var swordConf = maxConf["sword"] || 0;
+        
+        console.log('peterRaw:', peterRaw, 'paulRaw:', paulRaw, 'keyConf:', keyConf, 'swordConf:', swordConf);
         
         var peterScore = 1 - (1 - peterRaw) * (1 - keyConf);
         var paulScore = 1 - (1 - paulRaw) * (1 - swordConf);
@@ -157,12 +235,25 @@ async function processImage(image) {
             verdict = 'Скорее Павел';
         }
         
+        var evidence = [];
+        if (peterRaw > 0.3) evidence.push('Фигура Петра ' + (peterRaw * 100).toFixed(0) + '%');
+        if (keyConf > 0.3) evidence.push('Ключ ' + (keyConf * 100).toFixed(0) + '%');
+        if (paulRaw > 0.3) evidence.push('Фигура Павла ' + (paulRaw * 100).toFixed(0) + '%');
+        if (swordConf > 0.3) evidence.push('Меч ' + (swordConf * 100).toFixed(0) + '%');
+        
+        var evidenceText = evidence.length > 0 ? evidence.join(' + ') : 'Нет уверенных обнаружений';
+        
         console.log('Вердикт:', verdict);
         
         return {
             verdict: verdict,
             peter_probability: peterProb,
-            paul_probability: paulProb
+            paul_probability: paulProb,
+            peterRaw: peterRaw,
+            paulRaw: paulRaw,
+            keyConf: keyConf,
+            swordConf: swordConf,
+            evidence: evidenceText
         };
     } catch (error) {
         console.error('Ошибка обработки:', error);
@@ -237,15 +328,16 @@ imageInput.addEventListener('change', function(e) {
                 
                 probabilities.innerHTML = 
                     '<div class="prob-bar">' +
-                    '<span>Пётр</span>' +
-                    '<div class="bar"><div style="width:' + peterPercent + '%; background:#DC143C;"></div></div>' +
-                    '<span>' + peterPercent + '%</span>' +
+                        '<span class="prob-label prob-label--peter">Пётр</span>' +
+                        '<div class="bar"><div class="bar-fill bar-fill--peter" style="width:' + peterPercent + '%"></div></div>' +
+                        '<span class="prob-value">' + peterPercent + '%</span>' +
                     '</div>' +
                     '<div class="prob-bar">' +
-                    '<span>Павел</span>' +
-                    '<div class="bar"><div style="width:' + paulPercent + '%; background:#2ECC71;"></div></div>' +
-                    '<span>' + paulPercent + '%</span>' +
-                    '</div>';
+                        '<span class="prob-label prob-label--paul">Павел</span>' +
+                        '<div class="bar"><div class="bar-fill bar-fill--paul" style="width:' + paulPercent + '%"></div></div>' +
+                        '<span class="prob-value">' + paulPercent + '%</span>' +
+                    '</div>' +
+                    '<p class="evidence-text">Доказательства: ' + result.evidence + '</p>';
             });
         };
     };
