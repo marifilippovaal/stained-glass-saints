@@ -1,39 +1,30 @@
-// ============================================
-// ЗАГРУЗКА МОДЕЛИ
-// ============================================
 let session = null;
 let classes = {};
 let classColors = {};
 
 async function loadModel() {
     try {
-        // Загрузка классов
         const classResponse = await fetch('model/classes.json');
         classes = await classResponse.json();
         
-        // Генерация цветов для классов
         Object.keys(classes).forEach(key => {
             classColors[key] = `hsl(${Math.random() * 360}, 80%, 60%)`;
         });
 
-        // Загрузка ONNX модели
         const modelUrl = 'model/best.onnx';
         session = await ort.InferenceSession.create(modelUrl, {
             executionProviders: ['wasm'],
             graphOptimizationLevel: 'all'
         });
 
-        console.log('✅ Модель загружена');
+        console.log('Модель загружена');
         return true;
     } catch (error) {
-        console.error('❌ Ошибка загрузки:', error);
+        console.error('Ошибка загрузки:', error);
         return false;
     }
 }
 
-// ============================================
-// ПРЕДОБРАБОТКА ИЗОБРАЖЕНИЯ
-// ============================================
 async function preprocessImage(image) {
     const canvas = document.createElement('canvas');
     canvas.width = 640;
@@ -44,29 +35,23 @@ async function preprocessImage(image) {
     const imageData = ctx.getImageData(0, 0, 640, 640);
     const data = imageData.data;
     
-    // Нормализация: [0,255] -> [0,1]
     const float32Data = new Float32Array(3 * 640 * 640);
     for (let i = 0; i < data.length; i += 4) {
         const idx = i / 4;
-        float32Data[idx] = data[i] / 255.0;         // R
-        float32Data[640*640 + idx] = data[i+1] / 255.0; // G
-        float32Data[2*640*640 + idx] = data[i+2] / 255.0; // B
+        float32Data[idx] = data[i] / 255.0;
+        float32Data[640*640 + idx] = data[i+1] / 255.0;
+        float32Data[2*640*640 + idx] = data[i+2] / 255.0;
     }
     
     return new ort.Tensor('float32', float32Data, [1, 3, 640, 640]);
 }
 
-// ============================================
-// ПОСТОБРАБОТКА (YOLOv8-seg)
-// ============================================
 function postprocess(outputs, confThreshold = 0.25) {
     const boxes = [];
     const scores = [];
     const classIds = [];
     const masks = [];
 
-    // output0: [1, 40, 8400] - детекция
-    // output1: [1, 32, 160, 160] - маски
     const detections = outputs[0].data;
     const maskCoeffs = outputs[1].data;
 
@@ -82,7 +67,6 @@ function postprocess(outputs, confThreshold = 0.25) {
         const x2 = detections[offset + 2];
         const y2 = detections[offset + 3];
         
-        // Находим лучший класс
         let maxScore = -Infinity;
         let bestClass = -1;
         const classStart = offset + numCoords + numMaskCoeffs;
@@ -111,9 +95,6 @@ function postprocess(outputs, confThreshold = 0.25) {
     return { boxes, scores, classIds, masks };
 }
 
-// ============================================
-= ОСНОВНАЯ ФУНКЦИЯ ИНФЕРЕНСА
-// ============================================
 async function predict(image) {
     if (!session) {
         alert('Модель еще не загружена');
@@ -124,10 +105,8 @@ async function predict(image) {
         const inputTensor = await preprocessImage(image);
         const results = await session.run({ images: inputTensor });
         
-        // Обработка результатов
         const detections = postprocess([results.output0, results.output1]);
         
-        // Поиск святых
         let peterProb = 0;
         let paulProb = 0;
         
@@ -139,7 +118,6 @@ async function predict(image) {
             if (classes[classId] === 'saint Paul') paulProb = score;
         }
         
-        // Вердикт
         let verdict = 'Неопределенно';
         if (peterProb > paulProb && peterProb > 0.3) verdict = 'Апостол Петр';
         else if (paulProb > peterProb && paulProb > 0.3) verdict = 'Апостол Павел';
@@ -156,9 +134,6 @@ async function predict(image) {
     }
 }
 
-// ============================================
-= UI ОБРАБОТКА
-// ============================================
 const imageInput = document.getElementById('imageInput');
 const preview = document.getElementById('preview');
 const previewContainer = document.getElementById('previewContainer');
@@ -166,7 +141,6 @@ const saintName = document.getElementById('saintName');
 const saintDescription = document.getElementById('saintDescription');
 const probabilities = document.getElementById('probabilities');
 
-// Загрузка модели при старте
 loadModel();
 
 imageInput.addEventListener('change', async (e) => {
@@ -178,17 +152,13 @@ imageInput.addEventListener('change', async (e) => {
         preview.src = event.target.result;
         previewContainer.style.display = 'block';
         
-        // Ждем загрузки изображения
         await new Promise(resolve => preview.onload = resolve);
         
-        // Инференс
         const result = await predict(preview);
         if (!result) return;
         
-        // Обновление UI
         saintName.textContent = result.verdict;
         
-        // Информация о святом
         let info = {};
         if (result.verdict === 'Апостол Петр') {
             const resp = await fetch('assets/peter_info.json');
@@ -199,7 +169,6 @@ imageInput.addEventListener('change', async (e) => {
         }
         saintDescription.textContent = info.description || '';
         
-        // Вероятности
         probabilities.innerHTML = `
             <div class="prob-bar">
                 <span>Св. Петр</span>
