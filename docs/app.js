@@ -3,9 +3,9 @@ let modelReady = false;
 
 const classNames = {
     0: "key",
-    1: "sword", 
+    1: "saint Paul",
     2: "saint Peter",
-    3: "saint Paul"
+    3: "sword"
 };
 
 const displayNames = {
@@ -18,13 +18,11 @@ const displayNames = {
 async function loadModel() {
     try {
         console.log('Загрузка модели...');
-        
         const modelUrl = 'model/best.onnx';
         session = await ort.InferenceSession.create(modelUrl, {
             executionProviders: ['wasm'],
             graphOptimizationLevel: 'all'
         });
-        
         modelReady = true;
         console.log('Модель успешно загружена!');
         document.getElementById('saintName').textContent = 'Модель готова';
@@ -71,19 +69,18 @@ async function processImage(image) {
         console.log('Инференс выполнен');
         
         const detections = results.output0.data;
-        
-        let classConfs = {
-            "saint Peter": 0.0,
-            "saint Paul": 0.0,
-            "key": 0.0,
-            "sword": 0.0
-        };
-        
         const numDetections = 8400;
         const numClasses = 4;
         const numCoords = 4;
         const numMaskCoeffs = 32;
         const totalAttrs = numCoords + numMaskCoeffs + numClasses;
+        
+        let maxConf = {
+            "saint Peter": 0.0,
+            "saint Paul": 0.0,
+            "key": 0.0,
+            "sword": 0.0
+        };
         
         for (let i = 0; i < numDetections; i++) {
             const offset = i * totalAttrs;
@@ -92,72 +89,70 @@ async function processImage(image) {
             for (let c = 0; c < numClasses; c++) {
                 const score = detections[classStart + c];
                 const prob = 1 / (1 + Math.exp(-score));
-                
                 const className = classNames[c];
-                if (classConfs[className] !== undefined) {
-                    if (prob > classConfs[className]) {
-                        classConfs[className] = prob;
+                if (maxConf[className] !== undefined) {
+                    if (prob > maxConf[className]) {
+                        maxConf[className] = prob;
                     }
                 }
             }
         }
         
-        console.log('Детекции:', classConfs);
+        console.log('Максимальные уверенности:', maxConf);
         
-        const paulConf = classConfs["saint Paul"];
-        const peterConf = classConfs["saint Peter"];
-        const keyConf = classConfs["key"];
-        const swordConf = classConfs["sword"];
+        const peterRaw = Math.max(maxConf["saint Peter"] || 0, 0);
+        const paulRaw = Math.max(maxConf["saint Paul"] || 0, 0);
+        const keyConf = maxConf["key"] || 0;
+        const swordConf = maxConf["sword"] || 0;
         
-        const peterScore = 1 - (1 - peterConf) * (1 - keyConf);
-        const paulScore = 1 - (1 - paulConf) * (1 - swordConf);
-        
-        const totalScore = peterScore + paulScore;
+        const peterScore = 1 - (1 - peterRaw) * (1 - keyConf);
+        const paulScore = 1 - (1 - paulRaw) * (1 - swordConf);
+        const total = peterScore + paulScore;
         
         let peterProb = 0;
         let paulProb = 0;
         
-        if (totalScore > 0) {
-            peterProb = peterScore / totalScore;
-            paulProb = paulScore / totalScore;
+        if (total > 0) {
+            peterProb = peterScore / total;
+            paulProb = paulScore / total;
         }
         
         console.log('Итоговые вероятности - Петр:', peterProb, 'Павел:', paulProb);
         
         let verdict = 'Неопределенно';
+        let verdictColor = '#777';
         
-        if (totalScore === 0) {
-            verdict = 'Не определено';
-        } else if (peterProb >= 0.65 && paulProb < 0.35) {
-            verdict = 'Апостол Петр';
-        } else if (paulProb >= 0.65 && peterProb < 0.35) {
+        if (total === 0) {
+            verdict = 'Апостол не определён';
+        } else if (peterProb >= 0.65) {
+            verdict = 'Апостол Пётр';
+        } else if (paulProb >= 0.65) {
             verdict = 'Апостол Павел';
         } else if (peterProb >= 0.35 && paulProb >= 0.35) {
-            verdict = 'Возможно оба';
+            verdict = 'Оба: Пётр и Павел';
         } else if (peterProb > paulProb) {
-            verdict = 'Скорее Петр';
+            verdict = 'Скорее Пётр';
         } else {
             verdict = 'Скорее Павел';
         }
         
-        let evidencePeter = [];
-        let evidencePaul = [];
+        let evidence = [];
+        if (peterRaw > 0.1) evidence.push('Фигура Петра ' + (peterRaw * 100).toFixed(0) + '%');
+        if (keyConf > 0.1) evidence.push('Ключ ' + (keyConf * 100).toFixed(0) + '%');
+        if (paulRaw > 0.1) evidence.push('Фигура Павла ' + (paulRaw * 100).toFixed(0) + '%');
+        if (swordConf > 0.1) evidence.push('Меч ' + (swordConf * 100).toFixed(0) + '%');
         
-        if (peterConf > 0.1) evidencePeter.push('Пётр ' + (peterConf * 100).toFixed(0) + '%');
-        if (keyConf > 0.1) evidencePeter.push('ключ ' + (keyConf * 100).toFixed(0) + '%');
-        if (paulConf > 0.1) evidencePaul.push('Павел ' + (paulConf * 100).toFixed(0) + '%');
-        if (swordConf > 0.1) evidencePaul.push('меч ' + (swordConf * 100).toFixed(0) + '%');
+        const evidenceText = evidence.length > 0 ? evidence.join(' + ') : 'Нет уверенных обнаружений';
         
         return {
             verdict: verdict,
             peter_probability: peterProb,
             paul_probability: paulProb,
-            peterConf: peterConf,
-            paulConf: paulConf,
+            peterRaw: peterRaw,
+            paulRaw: paulRaw,
             keyConf: keyConf,
             swordConf: swordConf,
-            evidencePeter: evidencePeter.join(' + ') || 'нет признаков',
-            evidencePaul: evidencePaul.join(' + ') || 'нет признаков'
+            evidence: evidenceText
         };
     } catch (error) {
         console.error('Ошибка обработки:', error);
@@ -166,14 +161,14 @@ async function processImage(image) {
 }
 
 function loadInfo(verdict, callback) {
-    if (verdict === 'Апостол Петр' || verdict === 'Скорее Петр') {
+    if (verdict === 'Апостол Пётр' || verdict === 'Скорее Пётр') {
         fetch('assets/peter_info.json')
             .then(function(r) { return r.json(); })
             .then(function(data) {
                 callback(data.description);
             })
             .catch(function() {
-                callback('Апостол Петр с ключами');
+                callback('Апостол Пётр с ключами');
             });
     } else if (verdict === 'Апостол Павел' || verdict === 'Скорее Павел') {
         fetch('assets/paul_info.json')
@@ -184,10 +179,8 @@ function loadInfo(verdict, callback) {
             .catch(function() {
                 callback('Апостол Павел с мечом');
             });
-    } else if (verdict === 'Возможно оба') {
-        callback('На изображении могут быть оба апостола');
     } else {
-        callback('Святой не определен');
+        callback('Святой не определён');
     }
 }
 
@@ -233,9 +226,8 @@ imageInput.addEventListener('change', function(e) {
                 probabilities.innerHTML = 
                     '<div style="text-align:left; padding:10px;">' +
                     '<p><strong>Пётр:</strong> ' + peterPercent + '%</p>' +
-                    '<p style="font-size:0.9rem; color:#aaa; margin-left:15px;">' + result.evidencePeter + '</p>' +
+                    '<p style="font-size:0.9rem; color:#aaa; margin-left:15px;">Доказательства: ' + result.evidence + '</p>' +
                     '<p><strong>Павел:</strong> ' + paulPercent + '%</p>' +
-                    '<p style="font-size:0.9rem; color:#aaa; margin-left:15px;">' + result.evidencePaul + '</p>' +
                     '</div>';
             });
         };
