@@ -9,13 +9,6 @@ const classNames = {
     3: "sword"
 };
 
-const classIndices = {
-    "key": 0,
-    "saint Paul": 1,
-    "saint Peter": 2,
-    "sword": 3
-};
-
 async function loadModel() {
     if (modelLoading || modelReady) {
         return;
@@ -82,50 +75,33 @@ async function processImage(image) {
         console.log('Инференс выполнен');
         
         var detections = results.output0.data;
-        var numDetections = 8400;
+        var numDetections = detections.length / 38;
         var numClasses = 4;
         var numCoords = 4;
         var numMaskCoeffs = 32;
-        var totalAttrs = numCoords + numMaskCoeffs + numClasses;
+        var totalAttrs = 38;
         
-        // Для каждого класса собираем максимальную вероятность
+        console.log('Детекций после NMS:', numDetections);
+        
         var maxConf = {
             "key": 0.0,
-            "saint Paul": 0.0,
             "saint Peter": 0.0,
+            "saint Paul": 0.0,
             "sword": 0.0
-        };
-        
-        // Также собираем координаты для лучшей детекции каждого класса
-        var bestCoords = {
-            "key": null,
-            "saint Paul": null,
-            "saint Peter": null,
-            "sword": null
         };
         
         for (var i2 = 0; i2 < numDetections; i2++) {
             var offset = i2 * totalAttrs;
             var classStart = offset + numCoords + numMaskCoeffs;
             
-            // Получаем координаты
-            var x1 = detections[offset];
-            var y1 = detections[offset + 1];
-            var x2 = detections[offset + 2];
-            var y2 = detections[offset + 3];
-            
-            // Проверяем каждый класс
             for (var c = 0; c < numClasses; c++) {
                 var score = detections[classStart + c];
                 var prob = 1 / (1 + Math.exp(-score));
                 var className = classNames[c];
-                
-                // Для key используем более высокий порог, так как его меньше
-                var threshold = (className === "key") ? 0.4 : 0.5;
-                
-                if (prob > threshold && prob > maxConf[className]) {
-                    maxConf[className] = prob;
-                    bestCoords[className] = { x1: x1, y1: y1, x2: x2, y2: y2 };
+                if (maxConf[className] !== undefined) {
+                    if (prob > maxConf[className]) {
+                        maxConf[className] = prob;
+                    }
                 }
             }
         }
@@ -139,7 +115,6 @@ async function processImage(image) {
         
         console.log('peterRaw:', peterRaw, 'paulRaw:', paulRaw, 'keyConf:', keyConf, 'swordConf:', swordConf);
         
-        // Объединяем признаки как в Colab
         var peterScore = 1 - (1 - peterRaw) * (1 - keyConf);
         var paulScore = 1 - (1 - paulRaw) * (1 - swordConf);
         var total = peterScore + paulScore;
