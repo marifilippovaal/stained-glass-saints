@@ -9,11 +9,11 @@ const classNames = {
     3: "sword"
 };
 
-const displayNames = {
-    "key": "Ключ",
-    "sword": "Меч",
-    "saint Paul": "Апостол Павел",
-    "saint Peter": "Апостол Пётр"
+const classIndices = {
+    "key": 0,
+    "saint Paul": 1,
+    "saint Peter": 2,
+    "sword": 3
 };
 
 async function loadModel() {
@@ -45,40 +45,6 @@ async function loadModel() {
         document.getElementById('saintDescription').textContent = 'Перезагрузите страницу';
         return false;
     }
-}
-
-function nms(detections, iouThreshold) {
-    if (detections.length === 0) return [];
-    if (iouThreshold === undefined) iouThreshold = 0.5;
-    
-    detections.sort(function(a, b) { return b.prob - a.prob; });
-    let selected = [];
-    
-    for (let i = 0; i < detections.length; i++) {
-        let keep = true;
-        for (let j = 0; j < selected.length; j++) {
-            var x1 = Math.max(detections[i].x1, selected[j].x1);
-            var y1 = Math.max(detections[i].y1, selected[j].y1);
-            var x2 = Math.min(detections[i].x2, selected[j].x2);
-            var y2 = Math.min(detections[i].y2, selected[j].y2);
-            
-            if (x1 < x2 && y1 < y2) {
-                var intersection = (x2 - x1) * (y2 - y1);
-                var area1 = (detections[i].x2 - detections[i].x1) * (detections[i].y2 - detections[i].y1);
-                var area2 = (selected[j].x2 - selected[j].x1) * (selected[j].y2 - selected[j].y1);
-                var iou = intersection / (area1 + area2 - intersection);
-                
-                if (iou > iouThreshold) {
-                    keep = false;
-                    break;
-                }
-            }
-        }
-        if (keep) {
-            selected.push(detections[i]);
-        }
-    }
-    return selected;
 }
 
 async function processImage(image) {
@@ -122,75 +88,49 @@ async function processImage(image) {
         var numMaskCoeffs = 32;
         var totalAttrs = numCoords + numMaskCoeffs + numClasses;
         
-        var allDetections = [];
-        var classIds = {
-            "key": 0,
-            "saint Paul": 1,
-            "saint Peter": 2,
-            "sword": 3
+        // Для каждого класса собираем максимальную вероятность
+        var maxConf = {
+            "key": 0.0,
+            "saint Paul": 0.0,
+            "saint Peter": 0.0,
+            "sword": 0.0
+        };
+        
+        // Также собираем координаты для лучшей детекции каждого класса
+        var bestCoords = {
+            "key": null,
+            "saint Paul": null,
+            "saint Peter": null,
+            "sword": null
         };
         
         for (var i2 = 0; i2 < numDetections; i2++) {
             var offset = i2 * totalAttrs;
             var classStart = offset + numCoords + numMaskCoeffs;
             
-            var maxProb = 0;
-            var maxClass = -1;
+            // Получаем координаты
+            var x1 = detections[offset];
+            var y1 = detections[offset + 1];
+            var x2 = detections[offset + 2];
+            var y2 = detections[offset + 3];
+            
+            // Проверяем каждый класс
             for (var c = 0; c < numClasses; c++) {
                 var score = detections[classStart + c];
                 var prob = 1 / (1 + Math.exp(-score));
-                if (prob > maxProb) {
-                    maxProb = prob;
-                    maxClass = c;
+                var className = classNames[c];
+                
+                // Для key используем более высокий порог, так как его меньше
+                var threshold = (className === "key") ? 0.4 : 0.5;
+                
+                if (prob > threshold && prob > maxConf[className]) {
+                    maxConf[className] = prob;
+                    bestCoords[className] = { x1: x1, y1: y1, x2: x2, y2: y2 };
                 }
             }
-            
-            if (maxProb > 0.25 && maxClass >= 0) {
-                var x1 = detections[offset];
-                var y1 = detections[offset + 1];
-                var x2 = detections[offset + 2];
-                var y2 = detections[offset + 3];
-                
-                allDetections.push({
-                    classId: maxClass,
-                    className: classNames[maxClass],
-                    prob: maxProb,
-                    x1: x1,
-                    y1: y1,
-                    x2: x2,
-                    y2: y2
-                });
-            }
         }
         
-        console.log('Всего детекций до NMS:', allDetections.length);
-        
-        var classGroups = {};
-        for (var d = 0; d < allDetections.length; d++) {
-            var det = allDetections[d];
-            if (!classGroups[det.className]) {
-                classGroups[det.className] = [];
-            }
-            classGroups[det.className].push(det);
-        }
-        
-        var maxConf = {
-            "saint Peter": 0.0,
-            "saint Paul": 0.0,
-            "key": 0.0,
-            "sword": 0.0
-        };
-        
-        for (var className in classGroups) {
-            var dets = classGroups[className];
-            var filtered = nms(dets, 0.5);
-            if (filtered.length > 0) {
-                filtered.sort(function(a, b) { return b.prob - a.prob; });
-                maxConf[className] = filtered[0].prob;
-            }
-        }
-        
-        console.log('Максимальные уверенности после NMS:', maxConf);
+        console.log('Максимальные уверенности:', maxConf);
         
         var peterRaw = maxConf["saint Peter"] || 0;
         var paulRaw = maxConf["saint Paul"] || 0;
@@ -199,6 +139,7 @@ async function processImage(image) {
         
         console.log('peterRaw:', peterRaw, 'paulRaw:', paulRaw, 'keyConf:', keyConf, 'swordConf:', swordConf);
         
+        // Объединяем признаки как в Colab
         var peterScore = 1 - (1 - peterRaw) * (1 - keyConf);
         var paulScore = 1 - (1 - paulRaw) * (1 - swordConf);
         var total = peterScore + paulScore;
@@ -215,7 +156,7 @@ async function processImage(image) {
         
         var verdict = 'Неопределенно';
         
-        if (total === 0) {
+        if (total === 0 || (peterProb < 0.3 && paulProb < 0.3)) {
             verdict = 'Апостол не определён';
         } else if (peterProb >= 0.65 && paulProb < 0.35) {
             verdict = 'Апостол Пётр';
@@ -234,10 +175,10 @@ async function processImage(image) {
         }
         
         var evidence = [];
-        if (peterRaw > 0.1) evidence.push('Фигура Петра ' + (peterRaw * 100).toFixed(0) + '%');
-        if (keyConf > 0.1) evidence.push('Ключ ' + (keyConf * 100).toFixed(0) + '%');
-        if (paulRaw > 0.1) evidence.push('Фигура Павла ' + (paulRaw * 100).toFixed(0) + '%');
-        if (swordConf > 0.1) evidence.push('Меч ' + (swordConf * 100).toFixed(0) + '%');
+        if (peterRaw > 0.3) evidence.push('Фигура Петра ' + (peterRaw * 100).toFixed(0) + '%');
+        if (keyConf > 0.3) evidence.push('Ключ ' + (keyConf * 100).toFixed(0) + '%');
+        if (paulRaw > 0.3) evidence.push('Фигура Павла ' + (paulRaw * 100).toFixed(0) + '%');
+        if (swordConf > 0.3) evidence.push('Меч ' + (swordConf * 100).toFixed(0) + '%');
         
         var evidenceText = evidence.length > 0 ? evidence.join(' + ') : 'Нет уверенных обнаружений';
         
