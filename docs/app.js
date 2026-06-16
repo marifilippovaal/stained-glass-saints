@@ -109,15 +109,10 @@ async function processImage(image) {
         console.log('Инференс выполнен');
         
         var outputTensor = results.output0;
-        var dims = outputTensor.dims; // ожидаем [1, 40, 8400]
+        var dims = outputTensor.dims;
         var detections = outputTensor.data;
         console.log('Форма выхода модели:', dims);
 
-        // YOLOv8 экспортирует тензор как [1, attrs, numDetections] (channel-major),
-        // т.е. сначала идут все 8400 значений cx, потом все 8400 значений cy и т.д.
-        // Раньше код читал данные как [1, numDetections, attrs], из-за чего
-        // на месте class-score оказывались координаты/маски — отсюда и
-        // аномально высокая "уверенность" у всех классов.
         var channelMajor = dims[1] < dims[2];
         var totalAttrs = channelMajor ? dims[1] : dims[2];
         var numDetections = channelMajor ? dims[2] : dims[1];
@@ -131,10 +126,6 @@ async function processImage(image) {
             return detections[detIdx * totalAttrs + attrIdx];
         }
 
-        // Порядок каналов в выходе YOLOv8-seg: [box(4), classes(numClasses), mask_coeffs(32)]
-        // Координаты — это cx, cy, w, h (центр + размеры), а не x1,y1,x2,y2.
-        // Class-скоры уже прошли sigmoid внутри модели при экспорте — повторная
-        // сигмоида здесь была лишней и "сглаживала" все вероятности к середине.
         var allDetections = [];
 
         for (var i2 = 0; i2 < numDetections; i2++) {
@@ -173,11 +164,9 @@ async function processImage(image) {
         
         console.log('Детекций до NMS:', allDetections.length);
         
-        // Применяем NMS
         var filteredDetections = nms(allDetections, 0.45);
         console.log('Детекций после NMS:', filteredDetections.length);
         
-        // Берем максимальную уверенность для каждого класса
         var maxConf = {
             "key": 0.0,
             "saint Paul": 0.0,
@@ -323,21 +312,8 @@ imageInput.addEventListener('change', function(e) {
                     saintDescription.textContent = desc;
                 });
                 
-                var peterPercent = (result.peter_probability * 100).toFixed(1);
-                var paulPercent = (result.paul_probability * 100).toFixed(1);
-                
-                probabilities.innerHTML = 
-                    '<div class="prob-bar">' +
-                        '<span class="prob-label prob-label--peter">Пётр</span>' +
-                        '<div class="bar"><div class="bar-fill bar-fill--peter" style="width:' + peterPercent + '%"></div></div>' +
-                        '<span class="prob-value">' + peterPercent + '%</span>' +
-                    '</div>' +
-                    '<div class="prob-bar">' +
-                        '<span class="prob-label prob-label--paul">Павел</span>' +
-                        '<div class="bar"><div class="bar-fill bar-fill--paul" style="width:' + paulPercent + '%"></div></div>' +
-                        '<span class="prob-value">' + paulPercent + '%</span>' +
-                    '</div>' +
-                    '<p class="evidence-text">Доказательства: ' + result.evidence + '</p>';
+                // Только текст с доказательствами, без слайдеров
+                probabilities.innerHTML = '<p class="evidence-text">Доказательства: ' + result.evidence + '</p>';
             });
         };
     };
