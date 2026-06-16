@@ -9,6 +9,40 @@ const classNames = {
     3: "sword"
 };
 
+function nms(detections, iouThreshold) {
+    if (detections.length === 0) return [];
+    if (iouThreshold === undefined) iouThreshold = 0.45;
+    
+    detections.sort(function(a, b) { return b.confidence - a.confidence; });
+    var selected = [];
+    
+    for (var i = 0; i < detections.length; i++) {
+        var keep = true;
+        for (var j = 0; j < selected.length; j++) {
+            var x1 = Math.max(detections[i].x1, selected[j].x1);
+            var y1 = Math.max(detections[i].y1, selected[j].y1);
+            var x2 = Math.min(detections[i].x2, selected[j].x2);
+            var y2 = Math.min(detections[i].y2, selected[j].y2);
+            
+            if (x1 < x2 && y1 < y2) {
+                var intersection = (x2 - x1) * (y2 - y1);
+                var area1 = (detections[i].x2 - detections[i].x1) * (detections[i].y2 - detections[i].y1);
+                var area2 = (selected[j].x2 - selected[j].x1) * (selected[j].y2 - selected[j].y1);
+                var iou = intersection / (area1 + area2 - intersection);
+                
+                if (iou > iouThreshold) {
+                    keep = false;
+                    break;
+                }
+            }
+        }
+        if (keep) {
+            selected.push(detections[i]);
+        }
+    }
+    return selected;
+}
+
 async function loadModel() {
     if (modelLoading || modelReady) {
         return;
@@ -75,37 +109,18 @@ async function processImage(image) {
         console.log('Инференс выполнен');
         
         var detections = results.output0.data;
-        var numDetections = 0;
-        
-        // Проверяем формат выхода
-        if (detections.length === 11400) {
-            // Формат с NMS: [1, 38, 300]
-            numDetections = 300;
-            console.log('Формат с NMS: 300 детекций');
-        } else {
-            // Формат без NMS: [1, 40, 8400]
-            numDetections = 8400;
-            console.log('Формат без NMS: 8400 детекций');
-        }
-        
+        var numDetections = 8400;
         var numClasses = 4;
         var numCoords = 4;
         var numMaskCoeffs = 32;
-        var totalAttrs = 38;
-        var classStartOffset = numCoords + numMaskCoeffs;
+        var totalAttrs = numCoords + numMaskCoeffs + numClasses;
         
-        var maxConf = {
-            "key": 0.0,
-            "saint Paul": 0.0,
-            "saint Peter": 0.0,
-            "sword": 0.0
-        };
-        
-        var detectionsList = [];
+        // Собираем все детекции с вероятностью > 0.3
+        var allDetections = [];
         
         for (var i2 = 0; i2 < numDetections; i2++) {
             var offset = i2 * totalAttrs;
-            var classStart = offset + classStartOffset;
+            var classStart = offset + numCoords + numMaskCoeffs;
             
             var maxProb = 0;
             var maxClass = -1;
@@ -118,29 +133,45 @@ async function processImage(image) {
                 }
             }
             
-            if (maxProb > 0.1) {
-                var className = classNames[maxClass];
+            if (maxProb > 0.3) {
                 var x1 = detections[offset];
                 var y1 = detections[offset + 1];
                 var x2 = detections[offset + 2];
                 var y2 = detections[offset + 3];
                 
-                detectionsList.push({
-                    class: className,
-                    prob: maxProb,
+                allDetections.push({
+                    classId: maxClass,
+                    className: classNames[maxClass],
+                    confidence: maxProb,
                     x1: x1,
                     y1: y1,
                     x2: x2,
                     y2: y2
                 });
-                
-                if (maxProb > maxConf[className]) {
-                    maxConf[className] = maxProb;
-                }
             }
         }
         
-        console.log('Найдено детекций:', detectionsList.length);
+        console.log('Детекций до NMS:', allDetections.length);
+        
+        // Применяем NMS
+        var filteredDetections = nms(allDetections, 0.45);
+        console.log('Детекций после NMS:', filteredDetections.length);
+        
+        // Берем максимальную уверенность для каждого класса
+        var maxConf = {
+            "key": 0.0,
+            "saint Paul": 0.0,
+            "saint Peter": 0.0,
+            "sword": 0.0
+        };
+        
+        for (var d = 0; d < filteredDetections.length; d++) {
+            var det = filteredDetections[d];
+            if (det.confidence > maxConf[det.className]) {
+                maxConf[det.className] = det.confidence;
+            }
+        }
+        
         console.log('Максимальные уверенности:', maxConf);
         
         var peterRaw = maxConf["saint Peter"] || 0;
