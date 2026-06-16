@@ -108,37 +108,57 @@ async function processImage(image) {
         
         console.log('Инференс выполнен');
         
-        var detections = results.output0.data;
-        var numDetections = 8400;
+        var outputTensor = results.output0;
+        var dims = outputTensor.dims; // ожидаем [1, 40, 8400]
+        var detections = outputTensor.data;
+        console.log('Форма выхода модели:', dims);
+
+        // YOLOv8 экспортирует тензор как [1, attrs, numDetections] (channel-major),
+        // т.е. сначала идут все 8400 значений cx, потом все 8400 значений cy и т.д.
+        // Раньше код читал данные как [1, numDetections, attrs], из-за чего
+        // на месте class-score оказывались координаты/маски — отсюда и
+        // аномально высокая "уверенность" у всех классов.
+        var channelMajor = dims[1] < dims[2];
+        var totalAttrs = channelMajor ? dims[1] : dims[2];
+        var numDetections = channelMajor ? dims[2] : dims[1];
         var numClasses = 4;
         var numCoords = 4;
-        var numMaskCoeffs = 32;
-        var totalAttrs = numCoords + numMaskCoeffs + numClasses;
-        
-        // Собираем все детекции с вероятностью > 0.3
+
+        function getAttr(detIdx, attrIdx) {
+            if (channelMajor) {
+                return detections[attrIdx * numDetections + detIdx];
+            }
+            return detections[detIdx * totalAttrs + attrIdx];
+        }
+
+        // Порядок каналов в выходе YOLOv8-seg: [box(4), classes(numClasses), mask_coeffs(32)]
+        // Координаты — это cx, cy, w, h (центр + размеры), а не x1,y1,x2,y2.
+        // Class-скоры уже прошли sigmoid внутри модели при экспорте — повторная
+        // сигмоида здесь была лишней и "сглаживала" все вероятности к середине.
         var allDetections = [];
-        
+
         for (var i2 = 0; i2 < numDetections; i2++) {
-            var offset = i2 * totalAttrs;
-            var classStart = offset + numCoords + numMaskCoeffs;
-            
+            var cx = getAttr(i2, 0);
+            var cy = getAttr(i2, 1);
+            var w  = getAttr(i2, 2);
+            var h  = getAttr(i2, 3);
+
             var maxProb = 0;
             var maxClass = -1;
             for (var c = 0; c < numClasses; c++) {
-                var score = detections[classStart + c];
-                var prob = 1 / (1 + Math.exp(-score));
+                var prob = getAttr(i2, numCoords + c);
                 if (prob > maxProb) {
                     maxProb = prob;
                     maxClass = c;
                 }
             }
-            
+
             if (maxProb > 0.3) {
-                var x1 = detections[offset];
-                var y1 = detections[offset + 1];
-                var x2 = detections[offset + 2];
-                var y2 = detections[offset + 3];
-                
+                var x1 = cx - w / 2;
+                var y1 = cy - h / 2;
+                var x2 = cx + w / 2;
+                var y2 = cy + h / 2;
+
                 allDetections.push({
                     classId: maxClass,
                     className: classNames[maxClass],
