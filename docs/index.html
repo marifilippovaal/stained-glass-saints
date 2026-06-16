@@ -3,27 +3,29 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Saint Detector - Витражи</title>
+    <title>Saint Detector - Распознавание святых</title>
     <link rel="stylesheet" href="styles.css">
 </head>
 <body>
     <div class="container">
         <header>
-            <h1> Saint Detector</h1>
-            <p>Распознавание святых на витражах</p>
+            <h1>Saint Detector</h1>
+            <p>Распознавание святых на витражах с помощью YOLOv8</p>
         </header>
 
         <div class="upload-section">
             <label for="imageInput" class="upload-btn">
-                📤 Выберите изображение
+                Выберите изображение
             </label>
             <input type="file" id="imageInput" accept="image/*">
+            <p id="statusText" style="margin-top:10px; color:#aaa; font-size:0.9rem;">
+                Статус: Ожидание загрузки
+            </p>
         </div>
 
         <div id="previewContainer" style="display:none;">
             <div class="image-wrapper">
                 <img id="preview" alt="Загруженное изображение">
-                <canvas id="segmentationCanvas"></canvas>
             </div>
         </div>
 
